@@ -1,0 +1,6 @@
+./scs.sh: 1: eval: MAC_ADDR_br-8ffd9216e984=024223f5194c: not found
+./scs.sh: 1: eval: IP_ADDR_br-8ffd9216e984=: not found
+./scs.sh: 1: eval: MAC_ADDR_br-d7291043a03a=024266e941ff: not found
+./scs.sh: 1: eval: IP_ADDR_br-d7291043a03a=: not found
+./scs.sh: 1: eval: MAC_ADDR_br-e8dfb0aeea86=02425fb5c932: not found
+./scs.sh: 1: eval: IP_ADDR_br-e8dfb0aeea86=: not found
