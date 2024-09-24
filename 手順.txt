@@ -1,44 +1,9 @@
-更改 IP、Gateway、DNS 在 Linux 系統中需透過命令列來完成，以下是詳細步驟：
-
-1. 打開終端機（Terminal）
-2. 輸入以下命令以進入 superuser 模式:
-   shell
-   sudo su
-   
-3. 輸入 superuser 密碼，以確認身份權限
-4. 編輯網路設定檔案，常見的設定檔案如下:
-   - Ubuntu 系統: /etc/network/interfaces
-   - CentOS/RHEL 系統: /etc/sysconfig/network-scripts/ifcfg-eth0
-
-5. 使用 vim 編輯設定檔案，例如:
-   shell
-   vim /etc/network/interfaces
-   
-6. 在檔案中找到需要更改的網路接口設定，例如 eth0，然後更改 IP、Gateway 和 DNS 設定，例如:
-   shell
-   auto eth0
-   iface eth0 inet static
-   address 192.168.1.10
-   netmask 255.255.255.0
-   gateway 192.168.1.1
-   dns-nameservers 8.8.8.8
-   
-   其中:
-   - address 為新的 IP 位址
-   - netmask 為新的子網路遮罩
-   - gateway 為新的預設閘道
-   - dns-nameservers 為新的 DNS 伺服器
-
-7. 更改完畢後，按下「Esc」鍵，然後輸入「:wq」以儲存變更並退出 vim 編輯器
-8. 重新啟動網路服務，以套用新的設定:
-   shell
-   service networking restart
-   
-9. 確認網路設定已正確套用:
-   shell
-   ifconfig
-   route -n
-   cat /etc/resolv.conf
-   
-
-完成以上步驟後，您的 Linux 系統就會使用新的 IP、Gateway 和 DNS 設定。希望這些步驟對您有所幫助！如果有任何問題，請隨時提出。
+1. 安裝 python 環境的 airflow
+https://medium.com/@maroofashraf987/installing-apache-airflow-on-linux-a-comprehensive-guide-5462b265e961
+2. 安裝 airflow 裡面的 mongodb (安裝完套件後, airflow UI 裡面的 connection 就有 mongo 可以選)
+https://pypi.org/project/apache-airflow-providers-mongo/
+3. Load data to MongoDB with Apache Airflow
+https://www.astronomer.io/docs/learn/airflow-mongodb
+4. 重啟 airflow
+   - ps aux | grep airflow 把 airflow webserver 的 pid kill 掉
+   - 下 airflow webserver --port 8080
