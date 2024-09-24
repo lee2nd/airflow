@@ -1,4 +1,0 @@
-nano /etc/resolv.conf 
-
-nameserver 10.88.15.195
-nameserver 10.88.15.175
