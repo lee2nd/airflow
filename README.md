@@ -1,3 +1,1 @@
-IP
-DNS
-GATEWAY
+
