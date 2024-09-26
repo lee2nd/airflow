@@ -1,17 +1,16 @@
 from airflow import DAG
 from airflow.operators.python import PythonOperator
-from datetime import datetime, timedelta
-import time
-import os
-from os.path import isfile, join
+from pymongo import MongoClient 
 import numpy as np
 import pandas as pd
+from datetime import datetime, timedelta
+import os
 from bson.binary import Binary
 import pickle
 import gridfs
-from pymongo import MongoClient
 import gc
 
+data_path = "/home/ivan/Program/AT_DATA/l4a"
 
 default_args = {
     'owner': 'airflow',
@@ -20,21 +19,52 @@ default_args = {
     'email_on_failure': False,
     'email_on_retry': False,
     'retries': 3, # -1 在失敗時將不斷重試直到成功為止
-    'retry_delay': timedelta(minutes=3),
+    'retry_delay': timedelta(minutes=1),
 }
 
 dag = DAG(
     'L4A_ETL',
     default_args=default_args,
     description='L4A_ETL',
-    schedule=timedelta(minutes=20),
+    schedule=timedelta(minutes=10), # 每 10 分鐘跑一次
 )
 
+# 資料庫連結
+client = MongoClient('mongodb://ivan:ivan@10.88.26.183:27017')
+db = client["AT"]
+collection_charge2d = db["L4A_charge2d"]
+collection_defectinfo = db["L4A_defectinfo"]
+fs_charge2d = gridfs.GridFS(db, collection="L4A_charge2d")
+fs_defectinfo = gridfs.GridFS(db, collection="L4A_defectinfo")
+
+# 創建 index 避免資料重複塞進資料庫
+collection_charge2d.create_index([("lm_time", 1),
+                                    ("eqp_id", 1),
+                                    ("op_id", 1),
+                                    ("recipe_id", 1),
+                                    ("chip_id", 1),
+                                    ("chip_pos", 1),
+                                    ("ins_cnt", 1),
+                                    ("step", 1),
+                                    ("charge_type", 1)], 
+                                unique=True)   
+collection_defectinfo.create_index([("lm_time", 1),
+                                    ("chip_start_time", 1),
+                                    ("chip_end_time", 1),
+                                    ("eqp_id", 1),
+                                    ("op_id", 1),
+                                    ("recipe_id", 1),
+                                    ("chip_id", 1),
+                                    ("chip_pos", 1),
+                                    ("ins_cnt", 1),
+                                    ("BIN", 1),
+                                    ("judgement", 1)], 
+                                unique=True) 
 
 def process_charge_file(file_path):
     
     filetype = file_path.split('.')[-1]
-    product = file_path.split('/')[2][:4]
+    product = file_path.split('/')[6][:4]
 
     if product == "Y136":
         W = 1440
@@ -77,46 +107,12 @@ def process_charge_file(file_path):
 
 
 def etl():
-
-    # 選擇 client
-    client = MongoClient('mongodb://wma:mamcb1@10.88.26.183:27017')
-    # 選擇 Database
-    db = client["AT"]
-    # 選擇 collection
-    collection_charge2d = db["L4A_charge2d"]
-    collection_defectinfo = db["L4A_defectinfo"]
-    # 選擇 gridfs
-    fs_charge2d = gridfs.GridFS(db, collection="L4A_charge2d")
-    fs_defectinfo = gridfs.GridFS(db, collection="L4A_defectinfo")
-    # 創建 index 避免資料重複塞進資料庫
-    collection_charge2d.create_index([("lm_time", 1),
-                                        ("eqp_id", 1),
-                                        ("op_id", 1),
-                                        ("recipe_id", 1),
-                                        ("chip_id", 1),
-                                        ("chip_pos", 1),
-                                        ("ins_cnt", 1),
-                                        ("step", 1),
-                                        ("charge_type", 1)], 
-                                    unique=True)   
-    collection_defectinfo.create_index([("lm_time", 1),
-                                        ("chip_start_time", 1),
-                                        ("chip_end_time", 1),
-                                        ("eqp_id", 1),
-                                        ("op_id", 1),
-                                        ("recipe_id", 1),
-                                        ("chip_id", 1),
-                                        ("chip_pos", 1),
-                                        ("ins_cnt", 1),
-                                        ("BIN", 1),
-                                        ("judgement", 1)], 
-                                    unique=True)  
-
-    for file in os.listdir("../../mnt/disk2/AT_DATA/l4a/file_log"):
         
-        file_log_path = os.path.join("../../mnt/disk2/AT_DATA/l4a/file_log", file)
+    for file in os.listdir(f"{data_path}/file_log"):
+        
+        file_log_path = os.path.join(f"{data_path}/file_log", file)
         filename = file_log_path.split("/")[-1]
-            
+        
         try:
             filedate = datetime.strptime(filename[9:17], "%Y%m%d")
         except:
@@ -139,11 +135,10 @@ def etl():
                 current_time = datetime.now()
                 log_time = datetime.strptime(filelog[0], "%Y/%m/%d %H:%M:%S.%f")
                 time_difference = current_time - log_time
-                print(log_time)
                 
-                # if time_difference.total_seconds()/60 <= 30:
-                if 1:
+                if time_difference.total_seconds()/60 <= 15:
                     
+                    print(log_time)
                     # 有些 filelog 裡面沒有 op_id
                     if len(filelog) == 11:
                         filelog.insert(2, "")
@@ -204,7 +199,7 @@ def etl():
                             # 處理路徑檢視
                             print(file_path)
                             
-                            f = open(f"../../mnt/disk2/AT_DATA/l4a/{file_path}", 'r')
+                            f = open(f"{data_path}/{file_path}", 'r')
                             lines = f.readlines()
 
                             defect_info = []
@@ -860,14 +855,15 @@ def etl():
                                             'carryout': dict_co,                                            
                                             'file_path': file_path
                                             }
-                                
                             try:
                                 collection_defectinfo.insert_one(table_schema)
                                 del df_defect
-                                gc.collect()                               
+                                del table_schema
+                                gc.collect()
+                                print(gc.get_count())                                
                             except:
                                 # db 內本來就有資料
-                                pass
+                                pass                                
                                 
                         # Chargemap 2d 解檔
                         elif "Step" in file_name:
@@ -879,7 +875,7 @@ def etl():
                             # 處理路徑檢視
                             print(file_path)
 
-                            charge_2d_r, charge_2d_g, charge_2d_b = process_charge_file(f"../../mnt/disk2/AT_DATA/l4a/{file_path}")
+                            charge_2d_r, charge_2d_g, charge_2d_b = process_charge_file(f"{data_path}/{file_path}")
                             charge_2d_r = fs_charge2d.put(Binary(pickle.dumps(charge_2d_r, protocol=5)))
                             charge_2d_g = fs_charge2d.put(Binary(pickle.dumps(charge_2d_g, protocol=5)))
                             charge_2d_b = fs_charge2d.put(Binary(pickle.dumps(charge_2d_b, protocol=5)))
@@ -904,24 +900,27 @@ def etl():
                                 del charge_2d_r
                                 del charge_2d_g
                                 del charge_2d_b
-                                gc.collect()                               
+                                del table_schema
+                                gc.collect()                              
                             except:
                                 # db 內本來就有資料
                                 pass
-                        else:
                             
+                        else:
+                            # 非 adr, chargemap
                             continue
-
+    
     print("The current date and time is", datetime.now().strftime("%d/%m/%Y, %H:%M:%S"))
-    print("==========Done==========")
     client.close()
+    print("==========Done==========")
 
 
 task = PythonOperator(
     task_id='L4A_ETL',
     python_callable=etl,
     dag=dag,
-    execution_timeout=timedelta(minutes=20),
+    execution_timeout=timedelta(minutes=10),
 )
+
 
 task
