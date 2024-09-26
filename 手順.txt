@@ -6,4 +6,5 @@ https://pypi.org/project/apache-airflow-providers-mongo/
 https://www.astronomer.io/docs/learn/airflow-mongodb
 4. 重啟 airflow
    - ps aux | grep airflow 把 airflow webserver 的 pid kill 掉
-   - 下 airflow webserver --port 8080
+   - airflow webserver --port 8080
+   - airflow scheduler
