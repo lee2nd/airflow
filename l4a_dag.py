@@ -9,6 +9,8 @@ from bson.binary import Binary
 import pickle
 import gridfs
 import gc
+import trigger_setting
+
 
 data_path = "/home/ivan/Program/AT_DATA/l4a"
 
@@ -120,7 +122,7 @@ def etl():
         
         cond_1_1 = (filename[:3] == "UMC")
         cond_1_2 = (len(filename) == 21)
-        cond_1_3 = (filedate >= (datetime.now()-timedelta(days=0)).replace(hour=0, minute=0, second=0, microsecond=0))
+        cond_1_3 = (filedate >= (datetime.now()-timedelta(days=trigger_setting.day)).replace(hour=0, minute=0, second=0, microsecond=0))
         
         if all([cond_1_1,cond_1_2,cond_1_3]):
             
@@ -136,7 +138,7 @@ def etl():
                 log_time = datetime.strptime(filelog[0], "%Y/%m/%d %H:%M:%S.%f")
                 time_difference = current_time - log_time
                 
-                if time_difference.total_seconds()/60 <= 15:
+                if time_difference.total_seconds()/60 <= trigger_setting.time_difference:
                     
                     print(log_time)
                     # 有些 filelog 裡面沒有 op_id
@@ -199,7 +201,10 @@ def etl():
                             # 處理路徑檢視
                             print(file_path)
                             
-                            f = open(f"{data_path}/{file_path}", 'r')
+                            try:
+                                f = open(f"{data_path}/{file_path}", 'r')
+                            except:
+                                continue
                             lines = f.readlines()
 
                             defect_info = []
@@ -859,8 +864,7 @@ def etl():
                                 collection_defectinfo.insert_one(table_schema)
                                 del df_defect
                                 del table_schema
-                                gc.collect()
-                                print(gc.get_count())                                
+                                gc.collect()                            
                             except:
                                 # db 內本來就有資料
                                 pass                                
