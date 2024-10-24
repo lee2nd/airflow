@@ -28,7 +28,7 @@ dag = DAG(
     'L6K_ETL',
     default_args=default_args,
     description='L6K_ETL',
-    schedule=timedelta(hours=5), # 每 6 小時跑一次
+    schedule=timedelta(hours=6), # 每 6 小時跑一次
 )
 
 
@@ -931,13 +931,12 @@ def etl_chargemap():
     del chargemap_dict
     
     print("The current date and time is", datetime.now().strftime("%d/%m/%Y, %H:%M:%S"))
-    client.close()
     print("==========Done==========")
 
 
 task1 = BashOperator(
     task_id='unzip_files_within_1day',
-    bash_command='cd /home/ivan/Program/AT_DATA/l6k; find ./ -name "E*.zip" -ctime -1 -exec 7z x {} -o/home/ivan/Program/AT_DATA/l6k_real_time "*/CHARGE_MAP/*" "*/ADR/*" \;',
+    bash_command='cd /home/ivan/Program/AT_DATA/l6k; find ./ -name "E*.zip" -ctime -1 -size -5G -exec unzip -o {} "*/CHARGE_MAP/*" "*/ADR/*" -d /home/ivan/Program/AT_DATA/l6k_real_time/ \;',
     dag=dag
 )
 
