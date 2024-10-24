@@ -8,3 +8,6 @@ https://www.astronomer.io/docs/learn/airflow-mongodb
    - ps aux | grep airflow 把 airflow webserver 的 pid kill 掉
    - airflow webserver --port 8080
    - airflow scheduler
+5. 如果中間被問是否 replace all 則會卡住，加上 -o 可以讓程式自動往下走 
+   cd /home/ivan/Program/AT_DATA/l6k; find ./ -name "E*.zip" -ctime -1 -size -5G -exec unzip -o {} "*/CHARGE_MAP/*" "*/ADR/*" -d /home/ivan/Program/AT_DATA/l6k_real_time/ \;
+6. nohup 可以讓 terminal 在背景執行
