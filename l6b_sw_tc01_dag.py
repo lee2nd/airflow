@@ -17,7 +17,7 @@ data_path = "/home/ivan/Program/AT_DATA/l6b_sw_tc01"
 default_args = {
     'owner': 'airflow',
     'depends_on_past': False,
-    'start_date': datetime.today().replace(hour=0, minute=0),
+    'start_date': datetime(2024, 9, 1),
     'email_on_failure': False,
     'email_on_retry': False,
     'retries': 3, # -1 在失敗時將不斷重試直到成功為止
@@ -28,7 +28,7 @@ dag = DAG(
     'L6B_SW_TC01_ETL',
     default_args=default_args,
     description='L6B_SW_TC01_ETL',
-    schedule=timedelta(minutes=10), # 每 10 分鐘跑一次
+    schedule='*/10 * * * *', # 每 10 分鐘跑一次
 )
 
 
@@ -141,7 +141,9 @@ def etl():
                     op_id = filelog[2]
                     recipe_id = filelog[3]
                     lot_id = filelog[4]
+                    if filelog[7][0] != 'E' or len(filelog[7]) < 3: continue
                     chip_id = filelog[7]
+                    if "_" in chip_id: chip_id = chip_id.split("_")[0]
                     sheet_id = chip_id[:-5] + "P" + chip_id[-4:-2]
                     file_name = filelog[9]
                     file_path = filelog[10]
@@ -893,31 +895,30 @@ def etl():
                         
                         # 處理路徑檢視
                         print(file_path)
-
-                        charge_2d_r, charge_2d_g, charge_2d_b = process_charge_file(f"{data_path}/{file_path}", sheet_id)
-                        charge_2d_r = fs_charge2d.put(Binary(pickle.dumps(charge_2d_r, protocol=5)))
-                        charge_2d_g = fs_charge2d.put(Binary(pickle.dumps(charge_2d_g, protocol=5)))
-                        charge_2d_b = fs_charge2d.put(Binary(pickle.dumps(charge_2d_b, protocol=5)))
-                        
-                        table_schema = {'lm_time': lm_time,
-                                        'eqp_id': eqp_id,
-                                        'op_id': op_id,
-                                        'recipe_id': recipe_id,
-                                        'lot_id': lot_id,
-                                        'sheet_id': sheet_id,
-                                        'chip_id': chip_id,
-                                        'chip_pos': chip_pos,
-                                        'ins_cnt': ins_cnt,
-                                        'step': step,
-                                        'charge_type': charge_type,
-                                        '2d_r_object_id': charge_2d_r,                                        
-                                        '2d_g_object_id': charge_2d_g,
-                                        '2d_b_object_id': charge_2d_b,
-                                        'file_path': file_path
-                                        }
-
                         
                         try:
+                            charge_2d_r, charge_2d_g, charge_2d_b = process_charge_file(f"{data_path}/{file_path}", sheet_id)
+                            charge_2d_r = fs_charge2d.put(Binary(pickle.dumps(charge_2d_r, protocol=5)))
+                            charge_2d_g = fs_charge2d.put(Binary(pickle.dumps(charge_2d_g, protocol=5)))
+                            charge_2d_b = fs_charge2d.put(Binary(pickle.dumps(charge_2d_b, protocol=5)))
+                            
+                            table_schema = {'lm_time': lm_time,
+                                            'eqp_id': eqp_id,
+                                            'op_id': op_id,
+                                            'recipe_id': recipe_id,
+                                            'lot_id': lot_id,
+                                            'sheet_id': sheet_id,
+                                            'chip_id': chip_id,
+                                            'chip_pos': chip_pos,
+                                            'ins_cnt': ins_cnt,
+                                            'step': step,
+                                            'charge_type': charge_type,
+                                            '2d_r_object_id': charge_2d_r,                                        
+                                            '2d_g_object_id': charge_2d_g,
+                                            '2d_b_object_id': charge_2d_b,
+                                            'file_path': file_path
+                                            }
+                        
                             collection_charge2d.insert_one(table_schema)
                             del charge_2d_r
                             del charge_2d_g
