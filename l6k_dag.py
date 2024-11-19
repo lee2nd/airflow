@@ -5,7 +5,6 @@ from pymongo import MongoClient
 import numpy as np
 import pandas as pd
 from datetime import datetime, timedelta
-import os
 import glob
 import json
 from bson.binary import Binary
@@ -17,7 +16,7 @@ import gc
 default_args = {
     'owner': 'airflow',
     'depends_on_past': False,
-    'start_date': datetime.today().replace(hour=0, minute=0),
+    'start_date': datetime(2024, 9, 1),
     'email_on_failure': False,
     'email_on_retry': False,
     'retries': 3, # -1 在失敗時將不斷重試直到成功為止
@@ -28,7 +27,7 @@ dag = DAG(
     'L6K_ETL',
     default_args=default_args,
     description='L6K_ETL',
-    schedule=timedelta(hours=6), # 每 6 小時跑一次
+    schedule='0 */6 * * *', # 每 6 小時跑一次
 )
 
 
@@ -205,7 +204,7 @@ def etl_adr():
                     EQID = input_data[1]                
                 # op_id
                 elif input_data[0] == 'OP_ID':
-                    OP_ID = input_data[1]                
+                    OP_ID = "=".join(input_data[1:])
                 # recipe_id
                 elif input_data[0] == 'RECIPE_ID':
                     RECIPE_ID = input_data[1]                
