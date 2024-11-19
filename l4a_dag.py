@@ -17,7 +17,7 @@ data_path = "/home/ivan/Program/AT_DATA/l4a"
 default_args = {
     'owner': 'airflow',
     'depends_on_past': False,
-    'start_date': datetime.today().replace(hour=0, minute=0),
+    'start_date': datetime(2024, 9, 1),
     'email_on_failure': False,
     'email_on_retry': False,
     'retries': 3, # -1 在失敗時將不斷重試直到成功為止
@@ -28,7 +28,7 @@ dag = DAG(
     'L4A_ETL',
     default_args=default_args,
     description='L4A_ETL',
-    schedule=timedelta(minutes=10), # 每 10 分鐘跑一次
+    schedule='*/10 * * * *', # 每 10 分鐘跑一次
 )
 
 # 資料庫連結
@@ -83,6 +83,9 @@ def process_charge_file(file_path):
     elif product == "Z123":
         W = 4800
         H = 600
+    elif product == "L161":
+        W = 720
+        H = 540          
 
     if filetype in ['f1p','f20n']:
         C=0.002443
@@ -109,7 +112,7 @@ def process_charge_file(file_path):
 
 
 def etl():
-        
+    
     for file in os.listdir(f"{data_path}/file_log"):
         
         file_log_path = os.path.join(f"{data_path}/file_log", file)
@@ -151,6 +154,7 @@ def etl():
                     op_id = filelog[2]
                     recipe_id = filelog[3]
                     chip_id = filelog[7]
+                    if "_" in chip_id: chip_id = chip_id.split("_")[0]
                     file_name = filelog[9]
                     file_path = filelog[10]
                     file_path = file_path.replace("\\","/")[9:]
@@ -191,694 +195,693 @@ def etl():
 
                     dict_co = dict()   
 
-                    # Y136, Y173, V160, Z300, Z123 的 chip_id 長度為 6,15,17
-                    if len(chip_id) in [6,15,17]:
+                    # ADR 解檔成 Defect Information
+                    if "Adr" in file_name:
                         
-                        # ADR 解檔成 Defect Information
-                        if "Adr" in file_name:
+                        chip_pos = filelog[9].replace(".Adr","")
+                        # 處理路徑檢視
+                        print(file_path)
+                        
+                        try:
+                            f = open(f"{data_path}/{file_path}", 'r')
+                        except:
+                            continue
+                        lines = f.readlines()
+
+                        defect_info = []
+                        color = {0:'B',1:'R',2:'G'}
+                        Defect_code = ""
+
+                        d_no = 0
+                        
+                        step_s = 0
+                        step_pp_s, step_ds_s, step_do_s, step_vs_s, step_vo_s = 0, 0, 0, 0, 0
+                        step_pci3_1_s, step_pci3_2_s, step_pci3_3_s, step_pci3_4_s, step_pci3_5_s, step_pci3_6_s, step_pci3_7_s, step_pci3_8_s, step_pci3_9_s = 0, 0, 0, 0, 0, 0, 0, 0, 0
+                        step_pci3_10_s, step_pci3_11_s, step_pci3_12_s, step_pci3_13_s, step_pci3_14_s, step_pci3_15_s, step_pci3_16_s, step_pci3_17_s, step_pci3_18_s = 0, 0, 0, 0, 0, 0, 0, 0, 0
+                        step_pci_4_s, step_pci_5_s, step_pci_6_s, step_pci_7_s = 0, 0, 0, 0
+                        step_co_s = 0
+
+                        step_e = 0
+                        step_pp_e, step_ds_e, step_do_e, step_vs_e, step_vo_e = 999999, 999999, 999999, 999999, 999999
+                        step_pci3_1_e, step_pci3_2_e, step_pci3_3_e, step_pci3_4_e, step_pci3_5_e, step_pci3_6_e, step_pci3_7_e, step_pci3_8_e, step_pci3_9_e = 999999, 999999, 999999, 999999, 999999, 999999, 999999, 999999, 999999
+                        step_pci3_10_e, step_pci3_11_e, step_pci3_12_e, step_pci3_13_e, step_pci3_14_e, step_pci3_15_e, step_pci3_16_e, step_pci3_17_e, step_pci3_18_e = 999999, 999999, 999999, 999999, 999999, 999999, 999999, 999999, 999999
+                        step_pci_4_e, step_pci_5_e, step_pci_6_e, step_pci_7_e = 999999, 999999, 999999, 999999
+                        step_co_e = 999999
+
+                        for line in lines:
+
+                            d_no += 1
+                            line = line.replace('\n','')
+                            input_data = line.split('=')
                             
-                            chip_pos = filelog[9].replace(".Adr","")
-                            # 處理路徑檢視
-                            print(file_path)
-                            
-                            try:
-                                f = open(f"{data_path}/{file_path}", 'r')
-                            except:
-                                continue
-                            lines = f.readlines()
-
-                            defect_info = []
-                            color = {0:'B',1:'R',2:'G'}
-                            Defect_code = ""
-
-                            d_no = 0
-                            
-                            step_s = 0
-                            step_pp_s, step_ds_s, step_do_s, step_vs_s, step_vo_s = 0, 0, 0, 0, 0
-                            step_pci3_1_s, step_pci3_2_s, step_pci3_3_s, step_pci3_4_s, step_pci3_5_s, step_pci3_6_s, step_pci3_7_s, step_pci3_8_s, step_pci3_9_s = 0, 0, 0, 0, 0, 0, 0, 0, 0
-                            step_pci3_10_s, step_pci3_11_s, step_pci3_12_s, step_pci3_13_s, step_pci3_14_s, step_pci3_15_s, step_pci3_16_s, step_pci3_17_s, step_pci3_18_s = 0, 0, 0, 0, 0, 0, 0, 0, 0
-                            step_pci_4_s, step_pci_5_s, step_pci_6_s, step_pci_7_s = 0, 0, 0, 0
-                            step_co_s = 0
-
-                            step_e = 0
-                            step_pp_e, step_ds_e, step_do_e, step_vs_e, step_vo_e = 999999, 999999, 999999, 999999, 999999
-                            step_pci3_1_e, step_pci3_2_e, step_pci3_3_e, step_pci3_4_e, step_pci3_5_e, step_pci3_6_e, step_pci3_7_e, step_pci3_8_e, step_pci3_9_e = 999999, 999999, 999999, 999999, 999999, 999999, 999999, 999999, 999999
-                            step_pci3_10_e, step_pci3_11_e, step_pci3_12_e, step_pci3_13_e, step_pci3_14_e, step_pci3_15_e, step_pci3_16_e, step_pci3_17_e, step_pci3_18_e = 999999, 999999, 999999, 999999, 999999, 999999, 999999, 999999, 999999
-                            step_pci_4_e, step_pci_5_e, step_pci_6_e, step_pci_7_e = 999999, 999999, 999999, 999999
-                            step_co_e = 999999
-
-                            for line in lines:
-
-                                d_no += 1
-                                line = line.replace('\n','')
-                                input_data = line.split('=')
+                            if input_data[0] == 'BIN':
+                                BIN = input_data[1]
+                            elif input_data[0] == 'START_DATE':
+                                START_DATE = input_data[1]     
+                            elif input_data[0] == 'START_TIME':
+                                chip_start_time = START_DATE + " " + input_data[1]
+                            elif input_data[0] == 'END_DATE':
+                                END_DATE = input_data[1]     
+                            elif input_data[0] == 'END_TIME':
+                                chip_end_time = END_DATE + " " + input_data[1]
+                            elif input_data[0] == 'JUDGEMENT':
+                                judgement = input_data[1]                       
                                 
-                                if input_data[0] == 'BIN':
-                                    BIN = input_data[1]
-                                elif input_data[0] == 'START_DATE':
-                                    START_DATE = input_data[1]     
-                                elif input_data[0] == 'START_TIME':
-                                    chip_start_time = START_DATE + " " + input_data[1]
-                                elif input_data[0] == 'END_DATE':
-                                    END_DATE = input_data[1]     
-                                elif input_data[0] == 'END_TIME':
-                                    chip_end_time = END_DATE + " " + input_data[1]
-                                elif input_data[0] == 'JUDGEMENT':
-                                    judgement = input_data[1]                       
-                                    
-                                if "==Step" in line:
-
-                                    STEP = line.replace("=","")
-                                    step_s = d_no
-                                    step_e = 0
-                                    
-                                elif (step_e==0) and ("==END" in line) : 
-
-                                    step_s = 0
-                                    step_e = d_no-1
-
-                                elif step_s > 0 and step_e == 0: 
-
-                                    if line[0] == "[":
-                                        
-                                        Defect_code = line[1:-1]                                     
-                                        
-                                    elif line[:4] == "(S1:":
-                                        
-                                        temp = line.split("Val=")
-                                        value = temp[1]
-                                        temp = temp[0].split("Val=")[0][1:-2].split(",")
-                                        if len(temp) == 4:
-                                            S1 = temp[0][3:]
-                                            S2 = temp[1][3:]
-                                            G1 = temp[2][3:]
-                                            G2 = temp[3][3:]
-                                            for S in range(int(S1),int(S2)+1):
-                                                for G in range(int(G1),int(G2)+1):
-                                                    if recipe_id[:4] in ["V160","V161"]:
-                                                        if S%3 == 0:
-                                                            LED_Type = "B"
-                                                        elif S%3 == 1:
-                                                            LED_Type = "R"
-                                                        elif S%3 == 2:
-                                                            LED_Type = "G"                                                            
-                                                    else:                                            
-                                                        LED_Type = color[S%3]
-                                                    defect_info.append([STEP,Defect_code,LED_Type,S,G,value])   
-
-                                # 抓 function test - POWER_PIN
-                                if "[POWER_PIN]" in line:
-
-                                    step_pp_s = d_no
-                                    step_pp_e = 0
-                                    
-                                elif (step_pp_e==0) and ("TOTAL_CNT" in line) : 
-
-                                    step_pp_s = 0
-                                    step_pp_e = d_no-1
-
-                                elif step_pp_s > 0 and step_pp_e == 0: 
-                                    
-                                    line = line.split("=")[1]
-                                    key = line.split(",")[0]
-                                    value = line.split(",")[1].split("(")[0].replace(" ","")
-                                    if "(OK)" in line:
-                                        judge = "OK"
-                                    if "(NG)" in line:
-                                        judge = "NG"                                        
-                                    dict_pp[key] = [value,judge]
-
-                                # 抓 function test - DRIVER_SHORT
-                                if "[DRIVER_SHORT]" in line:
-
-                                    step_ds_s = d_no
-                                    step_ds_e = 0
-                                    
-                                elif (step_ds_e==0) and ("TOTAL_CNT" in line) : 
-
-                                    step_ds_s = 0
-                                    step_ds_e = d_no-1
-
-                                elif (step_ds_s > 0) and (step_ds_e == 0) and ("_A" in line): 
-                                    
-                                    key = line.split("<<")[0]
-                                    value = line.split(" = ")[1].split(" ")[0]
-                                    judge = line.split(" = ")[1].split(" ")[1][1:3]
-                                    dict_ds[key] = [value,judge]   
-
-                                # 抓 function test - DRIVER_OPEN
-                                if "[DRIVER_OPEN]" in line:
-
-                                    step_do_s = d_no
-                                    step_do_e = 0
-                                    
-                                elif (step_do_e==0) and ("TOTAL_CNT" in line) : 
-
-                                    step_do_s = 0
-                                    step_do_e = d_no-1
-
-                                elif (step_do_s > 0) and (step_do_e == 0) and ("_V" in line): 
-                                    
-                                    key = line.split("<<")[0]
-                                    value = line.split(" = ")[1].split(" ")[0]
-                                    judge = line.split(" = ")[1].split(" ")[1][1:3]
-                                    dict_do[key] = [value,judge]   
-
-                                # 抓 function test - VIDEO_SHORT
-                                if "[VIDEO_SHORT]" in line:
-
-                                    step_vs_s = d_no
-                                    step_vs_e = 0
-                                    
-                                elif (step_vs_e==0) and ("TOTAL_CNT" in line) : 
-
-                                    step_vs_s = 0
-                                    step_vs_e = d_no-1
-
-                                elif (step_vs_s > 0) and (step_vs_e == 0) and ("_A" in line): 
-                                    
-                                    key = line.split("_A")[0]
-                                    value = line.split(" = ")[1].split("(")[0]
-                                    if "(OK)" in line:
-                                        judge = "OK"
-                                    if "(NG)" in line:
-                                        judge = "NG"   
-                                        
-                                    dict_vs[key] = [value,judge] 
-
-                                # 抓 function test - VIDEO_OPEN
-                                if "[VIDEO_OPEN]" in line:
-
-                                    step_vo_s = d_no
-                                    step_vo_e = 0
-                                    
-                                elif (step_vo_e==0) and ("TOTAL_CNT" in line) : 
-
-                                    step_vo_s = 0
-                                    step_vo_e = d_no-1
-
-                                elif (step_vo_s > 0) and (step_vo_e == 0) and ("_V " in line): 
-                                    
-                                    key = line.split("_V ")[0]
-                                    value = line.split(" = ")[1].split("(")[0]
-                                    if "(OK)" in line:
-                                        judge = "OK"
-                                    if "(NG)" in line:
-                                        judge = "NG"  
-                                    dict_vo[key] = [value,judge]            
-
-                                # 抓 function test - POWER_CONSUME_INSPECTION_3_LOOP1
-                                if "[POWER_CONSUME_INSPECTION_3_LOOP1]" in line:
-
-                                    step_pci3_1_s = d_no
-                                    step_pci3_1_e = 0
-                                    
-                                elif (step_pci3_1_e==0) and ("TOTAL_CNT" in line) : 
-
-                                    step_pci3_1_s = 0
-                                    step_pci3_1_e = d_no-1
-
-                                elif (step_pci3_1_s > 0) and (step_pci3_1_e == 0) and ("_A " in line): 
-
-                                    key = line.split("(")[0]
-                                    value = line.split(" = ")[1].split("(")[0]
-                                    judge = line.split(" = ")[1].split("(")[1][:2]
-                                    dict_pci3_1[key] = [value,judge]    
-
-                                # 抓 function test - POWER_CONSUME_INSPECTION_3_LOOP2
-                                if "[POWER_CONSUME_INSPECTION_3_LOOP2]" in line:
-
-                                    step_pci3_2_s = d_no
-                                    step_pci3_2_e = 0
-                                    
-                                elif (step_pci3_2_e==0) and ("TOTAL_CNT" in line) : 
-
-                                    step_pci3_2_s = 0
-                                    step_pci3_2_e = d_no-1
-
-                                elif (step_pci3_2_s > 0) and (step_pci3_2_e == 0) and ("_A " in line): 
-
-                                    key = line.split("(")[0]
-                                    value = line.split(" = ")[1].split("(")[0]
-                                    judge = line.split(" = ")[1].split("(")[1][:2]
-                                    dict_pci3_2[key] = [value,judge]  
-                                    
-                                # 抓 function test - POWER_CONSUME_INSPECTION_3_LOOP3
-                                if "[POWER_CONSUME_INSPECTION_3_LOOP3]" in line:
-
-                                    step_pci3_3_s = d_no
-                                    step_pci3_3_e = 0
-                                    
-                                elif (step_pci3_3_e==0) and ("TOTAL_CNT" in line) : 
-
-                                    step_pci3_3_s = 0
-                                    step_pci3_3_e = d_no-1
-
-                                elif (step_pci3_3_s > 0) and (step_pci3_3_e == 0) and ("_A " in line): 
-
-                                    key = line.split("(")[0]
-                                    value = line.split(" = ")[1].split("(")[0]
-                                    judge = line.split(" = ")[1].split("(")[1][:2]
-                                    dict_pci3_3[key] = [value,judge]    
-
-                                # 抓 function test - POWER_CONSUME_INSPECTION_3_LOOP4
-                                if "[POWER_CONSUME_INSPECTION_3_LOOP4]" in line:
-
-                                    step_pci3_4_s = d_no
-                                    step_pci3_4_e = 0
-                                    
-                                elif (step_pci3_4_e==0) and ("TOTAL_CNT" in line) : 
-
-                                    step_pci3_4_s = 0
-                                    step_pci3_4_e = d_no-1
-
-                                elif (step_pci3_4_s > 0) and (step_pci3_4_e == 0) and ("_A " in line): 
-
-                                    key = line.split("(")[0]
-                                    value = line.split(" = ")[1].split("(")[0]
-                                    judge = line.split(" = ")[1].split("(")[1][:2]
-                                    dict_pci3_4[key] = [value,judge]    
-
-                                # 抓 function test - POWER_CONSUME_INSPECTION_3_LOOP5
-                                if "[POWER_CONSUME_INSPECTION_3_LOOP5]" in line:
-
-                                    step_pci3_5_s = d_no
-                                    step_pci3_5_e = 0
-                                    
-                                elif (step_pci3_5_e==0) and ("TOTAL_CNT" in line) : 
-
-                                    step_pci3_5_s = 0
-                                    step_pci3_5_e = d_no-1
-
-                                elif (step_pci3_5_s > 0) and (step_pci3_5_e == 0) and ("_A " in line): 
-
-                                    key = line.split("(")[0]
-                                    value = line.split(" = ")[1].split("(")[0]
-                                    judge = line.split(" = ")[1].split("(")[1][:2]
-                                    dict_pci3_5[key] = [value,judge]  
-                                    
-                                # 抓 function test - POWER_CONSUME_INSPECTION_3_LOOP6
-                                if "[POWER_CONSUME_INSPECTION_3_LOOP6]" in line:
-
-                                    step_pci3_6_s = d_no
-                                    step_pci3_6_e = 0
-                                    
-                                elif (step_pci3_6_e==0) and ("TOTAL_CNT" in line) : 
-
-                                    step_pci3_6_s = 0
-                                    step_pci3_6_e = d_no-1
-
-                                elif (step_pci3_6_s > 0) and (step_pci3_6_e == 0) and ("_A " in line): 
-
-                                    key = line.split("(")[0]
-                                    value = line.split(" = ")[1].split("(")[0]
-                                    judge = line.split(" = ")[1].split("(")[1][:2]
-                                    dict_pci3_6[key] = [value,judge]       
-
-                                # 抓 function test - POWER_CONSUME_INSPECTION_3_LOOP7
-                                if "[POWER_CONSUME_INSPECTION_3_LOOP7]" in line:
-
-                                    step_pci3_7_s = d_no
-                                    step_pci3_7_e = 0
-                                    
-                                elif (step_pci3_7_e==0) and ("TOTAL_CNT" in line) : 
-
-                                    step_pci3_7_s = 0
-                                    step_pci3_7_e = d_no-1
-
-                                elif (step_pci3_7_s > 0) and (step_pci3_7_e == 0) and ("_A " in line): 
-
-                                    key = line.split("(")[0]
-                                    value = line.split(" = ")[1].split("(")[0]
-                                    judge = line.split(" = ")[1].split("(")[1][:2]
-                                    dict_pci3_7[key] = [value,judge]    
-
-                                # 抓 function test - POWER_CONSUME_INSPECTION_3_LOOP8
-                                if "[POWER_CONSUME_INSPECTION_3_LOOP8]" in line:
-
-                                    step_pci3_8_s = d_no
-                                    step_pci3_8_e = 0
-                                    
-                                elif (step_pci3_8_e==0) and ("TOTAL_CNT" in line) : 
-
-                                    step_pci3_8_s = 0
-                                    step_pci3_8_e = d_no-1
-
-                                elif (step_pci3_8_s > 0) and (step_pci3_8_e == 0) and ("_A " in line): 
-
-                                    key = line.split("(")[0]
-                                    value = line.split(" = ")[1].split("(")[0]
-                                    judge = line.split(" = ")[1].split("(")[1][:2]
-                                    dict_pci3_8[key] = [value,judge]  
-                                    
-                                # 抓 function test - POWER_CONSUME_INSPECTION_3_LOOP9
-                                if "[POWER_CONSUME_INSPECTION_3_LOOP9]" in line:
-
-                                    step_pci3_9_s = d_no
-                                    step_pci3_9_e = 0
-                                    
-                                elif (step_pci3_9_e==0) and ("TOTAL_CNT" in line) : 
-
-                                    step_pci3_9_s = 0
-                                    step_pci3_9_e = d_no-1
-
-                                elif (step_pci3_9_s > 0) and (step_pci3_9_e == 0) and ("_A " in line): 
-
-                                    key = line.split("(")[0]
-                                    value = line.split(" = ")[1].split("(")[0]
-                                    judge = line.split(" = ")[1].split("(")[1][:2]
-                                    dict_pci3_9[key] = [value,judge]    
-
-                                # 抓 function test - POWER_CONSUME_INSPECTION_3_LOOP10
-                                if "[POWER_CONSUME_INSPECTION_3_LOOP10]" in line:
-
-                                    step_pci3_10_s = d_no
-                                    step_pci3_10_e = 0
-                                    
-                                elif (step_pci3_10_e==0) and ("TOTAL_CNT" in line) : 
-
-                                    step_pci3_10_s = 0
-                                    step_pci3_10_e = d_no-1
-
-                                elif (step_pci3_10_s > 0) and (step_pci3_10_e == 0) and ("_A " in line): 
-
-                                    key = line.split("(")[0]
-                                    value = line.split(" = ")[1].split("(")[0]
-                                    judge = line.split(" = ")[1].split("(")[1][:2]
-                                    dict_pci3_10[key] = [value,judge]    
-
-                                # 抓 function test - POWER_CONSUME_INSPECTION_3_LOOP11
-                                if "[POWER_CONSUME_INSPECTION_3_LOOP11]" in line:
-
-                                    step_pci3_11_s = d_no
-                                    step_pci3_11_e = 0
-                                    
-                                elif (step_pci3_11_e==0) and ("TOTAL_CNT" in line) : 
-
-                                    step_pci3_11_s = 0
-                                    step_pci3_11_e = d_no-1
-
-                                elif (step_pci3_11_s > 0) and (step_pci3_11_e == 0) and ("_A " in line): 
-
-                                    key = line.split("(")[0]
-                                    value = line.split(" = ")[1].split("(")[0]
-                                    judge = line.split(" = ")[1].split("(")[1][:2]
-                                    dict_pci3_11[key] = [value,judge]  
-                                    
-                                # 抓 function test - POWER_CONSUME_INSPECTION_3_LOOP12
-                                if "[POWER_CONSUME_INSPECTION_3_LOOP12]" in line:
-
-                                    step_pci3_12_s = d_no
-                                    step_pci3_12_e = 0
-                                    
-                                elif (step_pci3_12_e==0) and ("TOTAL_CNT" in line) : 
-
-                                    step_pci3_12_s = 0
-                                    step_pci3_12_e = d_no-1
-
-                                elif (step_pci3_12_s > 0) and (step_pci3_12_e == 0) and ("_A " in line): 
-
-                                    key = line.split("(")[0]
-                                    value = line.split(" = ")[1].split("(")[0]
-                                    judge = line.split(" = ")[1].split("(")[1][:2]
-                                    dict_pci3_12[key] = [value,judge]   
-
-                                # 抓 function test - POWER_CONSUME_INSPECTION_3_LOOP13
-                                if "[POWER_CONSUME_INSPECTION_3_LOOP13]" in line:
-
-                                    step_pci3_13_s = d_no
-                                    step_pci3_13_e = 0
-                                    
-                                elif (step_pci3_13_e==0) and ("TOTAL_CNT" in line) : 
-
-                                    step_pci3_13_s = 0
-                                    step_pci3_13_e = d_no-1
-
-                                elif (step_pci3_13_s > 0) and (step_pci3_13_e == 0) and ("_A " in line): 
-
-                                    key = line.split("(")[0]
-                                    value = line.split(" = ")[1].split("(")[0]
-                                    judge = line.split(" = ")[1].split("(")[1][:2]
-                                    dict_pci3_13[key] = [value,judge]    
-
-                                # 抓 function test - POWER_CONSUME_INSPECTION_3_LOOP14
-                                if "[POWER_CONSUME_INSPECTION_3_LOOP14]" in line:
-
-                                    step_pci3_14_s = d_no
-                                    step_pci3_14_e = 0
-                                    
-                                elif (step_pci3_14_e==0) and ("TOTAL_CNT" in line) : 
-
-                                    step_pci3_14_s = 0
-                                    step_pci3_14_e = d_no-1
-
-                                elif (step_pci3_14_s > 0) and (step_pci3_14_e == 0) and ("_A " in line): 
-
-                                    key = line.split("(")[0]
-                                    value = line.split(" = ")[1].split("(")[0]
-                                    judge = line.split(" = ")[1].split("(")[1][:2]
-                                    dict_pci3_14[key] = [value,judge]  
-                                    
-                                # 抓 function test - POWER_CONSUME_INSPECTION_3_LOOP15
-                                if "[POWER_CONSUME_INSPECTION_3_LOOP15]" in line:
-
-                                    step_pci3_15_s = d_no
-                                    step_pci3_15_e = 0
-                                    
-                                elif (step_pci3_15_e==0) and ("TOTAL_CNT" in line) : 
-
-                                    step_pci3_15_s = 0
-                                    step_pci3_15_e = d_no-1
-
-                                elif (step_pci3_15_s > 0) and (step_pci3_15_e == 0) and ("_A " in line): 
-
-                                    key = line.split("(")[0]
-                                    value = line.split(" = ")[1].split("(")[0]
-                                    judge = line.split(" = ")[1].split("(")[1][:2]
-                                    dict_pci3_15[key] = [value,judge]    
-
-                                # 抓 function test - POWER_CONSUME_INSPECTION_3_LOOP16
-                                if "[POWER_CONSUME_INSPECTION_3_LOOP16]" in line:
-
-                                    step_pci3_16_s = d_no
-                                    step_pci3_16_e = 0
-                                    
-                                elif (step_pci3_16_e==0) and ("TOTAL_CNT" in line) : 
-
-                                    step_pci3_16_s = 0
-                                    step_pci3_16_e = d_no-1
-
-                                elif (step_pci3_16_s > 0) and (step_pci3_16_e == 0) and ("_A " in line): 
-
-                                    key = line.split("(")[0]
-                                    value = line.split(" = ")[1].split("(")[0]
-                                    judge = line.split(" = ")[1].split("(")[1][:2]
-                                    dict_pci3_16[key] = [value,judge]    
-
-                                # 抓 function test - POWER_CONSUME_INSPECTION_3_LOOP17
-                                if "[POWER_CONSUME_INSPECTION_3_LOOP17]" in line:
-
-                                    step_pci3_17_s = d_no
-                                    step_pci3_17_e = 0
-                                    
-                                elif (step_pci3_17_e==0) and ("TOTAL_CNT" in line) : 
-
-                                    step_pci3_17_s = 0
-                                    step_pci3_17_e = d_no-1
-
-                                elif (step_pci3_17_s > 0) and (step_pci3_17_e == 0) and ("_A " in line): 
-
-                                    key = line.split("(")[0]
-                                    value = line.split(" = ")[1].split("(")[0]
-                                    judge = line.split(" = ")[1].split("(")[1][:2]
-                                    dict_pci3_17[key] = [value,judge]  
-                                    
-                                # 抓 function test - POWER_CONSUME_INSPECTION_3_LOOP18
-                                if "[POWER_CONSUME_INSPECTION_3_LOOP18]" in line:
-
-                                    step_pci3_18_s = d_no
-                                    step_pci3_18_e = 0
-                                    
-                                elif (step_pci3_18_e==0) and ("TOTAL_CNT" in line) : 
-
-                                    step_pci3_18_s = 0
-                                    step_pci3_18_e = d_no-1
-
-                                elif (step_pci3_18_s > 0) and (step_pci3_18_e == 0) and ("_A " in line): 
-
-                                    key = line.split("(")[0]
-                                    value = line.split(" = ")[1].split("(")[0]
-                                    judge = line.split(" = ")[1].split("(")[1][:2]
-                                    dict_pci3_18[key] = [value,judge]                                       
-
-                                # 抓 function test - POWER_CONSUME_INSPECTION_4
-                                if "[POWER_CONSUME_INSPECTION_4]" in line:
-
-                                    step_pci_4_s = d_no
-                                    step_pci_4_e = 0
-                                    
-                                elif (step_pci_4_e==0) and ("TOTAL_CNT" in line) : 
-
-                                    step_pci_4_s = 0
-                                    step_pci_4_e = d_no-1
-
-                                elif (step_pci_4_s > 0) and (step_pci_4_e == 0) and ("_A " in line): 
-                                    
-                                    key = line.split("_A ")[0]
-                                    value = line.split(" = ")[1].split("(")[0]
-                                    if "(OK)" in line:
-                                        judge = "OK"
-                                    if "(NG)" in line:
-                                        judge = "NG"  
-                                    dict_pci_4[key] = [value,judge] 
-
-                                # 抓 function test - POWER_CONSUME_INSPECTION_5
-                                if "[POWER_CONSUME_INSPECTION_5]" in line:
-
-                                    step_pci_5_s = d_no
-                                    step_pci_5_e = 0
-                                    
-                                elif (step_pci_5_e==0) and ("TOTAL_CNT" in line) : 
-
-                                    step_pci_5_s = 0
-                                    step_pci_5_e = d_no-1
-
-                                elif (step_pci_5_s > 0) and (step_pci_5_e == 0) and ("_A " in line): 
-                                    
-                                    key = line.split("_A ")[0]
-                                    value = line.split(" = ")[1].split("(")[0]
-                                    if "(OK)" in line:
-                                        judge = "OK"
-                                    if "(NG)" in line:
-                                        judge = "NG"  
-                                    dict_pci_5[key] = [value,judge] 
-
-                                # 抓 function test - POWER_CONSUME_INSPECTION_6
-                                if "[POWER_CONSUME_INSPECTION_6]" in line:
-
-                                    step_pci_6_s = d_no
-                                    step_pci_6_e = 0
-                                    
-                                elif (step_pci_6_e==0) and ("TOTAL_CNT" in line) : 
-
-                                    step_pci_6_s = 0
-                                    step_pci_6_e = d_no-1
-
-                                elif (step_pci_6_s > 0) and (step_pci_6_e == 0) and ("_A " in line): 
-                                    
-                                    key = line.split("_A ")[0]
-                                    value = line.split(" = ")[1].split("(")[0]
-                                    if "(OK)" in line:
-                                        judge = "OK"
-                                    if "(NG)" in line:
-                                        judge = "NG"  
-                                    dict_pci_6[key] = [value,judge]                 
-
-                                # 抓 function test - POWER_CONSUME_INSPECTION_7_Step1
-                                if "[POWER_CONSUME_INSPECTION_7_Step1]" in line:
-
-                                    step_pci_7_s = d_no
-                                    step_pci_7_e = 0
-                                    
-                                elif (step_pci_7_e==0) and ("TOTAL_CNT" in line) : 
-
-                                    step_pci_7_s = 0
-                                    step_pci_7_e = d_no-1
-
-                                elif (step_pci_7_s > 0) and (step_pci_7_e == 0): 
-                                    
-                                    key = line.split("<<")[0]
-                                    value1 = line.split(" = ")[1].split(" ")[0]
-                                    judge1 = line.split(" = ")[1].split(" ")[1][1:3]
-                                    value2 = line.split(" = ")[1].split(",")[2].split(" ")[0]
-                                    judge2 = line.split(" = ")[1].split(",")[2].split(" ")[1][1:3]
-                                    dict_pci_7o[key] = [value1,judge1]
-                                    dict_pci_7s[key] = [value2,judge2]      
-
-                                # 抓 function test - CARRYOUT
-                                if "[CARRYOUT]" in line:
-
-                                    step_co_s = d_no
-                                    step_co_e = 0
-                                    
-                                elif (step_co_e==0) and ("TOTAL_CNT" in line) : 
-
-                                    step_co_s = 0
-                                    step_co_e = d_no-1
-
-                                elif (step_co_s > 0) and (step_co_e == 0): 
-                                    
-                                    key = line.split(" = ")[0]
-                                    value = line.split(" = ")[1].split(" ")[0]
-                                    judge = line.split(" = ")[1].split(" ")[1][1:3]
-                                    dict_co[key] = [value,judge]
-
-                            df_defect = pd.DataFrame(data=defect_info, columns=['Step','Defect_code','LED_Type','Source','Gate','Value'])
-                            df_defect = fs_defectinfo.put(Binary(pickle.dumps(df_defect, protocol=5))) 
-                                                                
-                            # assign whole chip information
-                            table_schema = {'lm_time': lm_time,
-                                            'chip_start_time': chip_start_time,
-                                            'chip_end_time': chip_end_time,
-                                            'eqp_id': eqp_id,
-                                            'op_id': op_id,
-                                            'recipe_id': recipe_id,
-                                            'chip_id': chip_id,
-                                            'chip_pos': chip_pos,
-                                            'ins_cnt': ins_cnt,
-                                            'BIN': BIN,
-                                            'judgement': judgement,
-                                            'df_defect': df_defect,
-                                            'power_pin': dict_pp,
-                                            'driver_short': dict_ds, 
-                                            'driver_open': dict_do, 
-                                            'video_short': dict_vs, 
-                                            'video_open': dict_vo,
-                                            'power_consume_inspection_3_loop1': dict_pci3_1,
-                                            'power_consume_inspection_3_loop2': dict_pci3_2,
-                                            'power_consume_inspection_3_loop3': dict_pci3_3,
-                                            'power_consume_inspection_3_loop4': dict_pci3_4,
-                                            'power_consume_inspection_3_loop5': dict_pci3_5,
-                                            'power_consume_inspection_3_loop6': dict_pci3_6,
-                                            'power_consume_inspection_3_loop7': dict_pci3_7,
-                                            'power_consume_inspection_3_loop8': dict_pci3_8,
-                                            'power_consume_inspection_3_loop9': dict_pci3_9,
-                                            'power_consume_inspection_3_loop10': dict_pci3_10,
-                                            'power_consume_inspection_3_loop11': dict_pci3_11,
-                                            'power_consume_inspection_3_loop12': dict_pci3_12,
-                                            'power_consume_inspection_3_loop13': dict_pci3_13,
-                                            'power_consume_inspection_3_loop14': dict_pci3_14,
-                                            'power_consume_inspection_3_loop15': dict_pci3_15,
-                                            'power_consume_inspection_3_loop16': dict_pci3_16,
-                                            'power_consume_inspection_3_loop17': dict_pci3_17,
-                                            'power_consume_inspection_3_loop18': dict_pci3_18,   
-                                            'power_consume_inspection_4': dict_pci_4,
-                                            'power_consume_inspection_5': dict_pci_5,
-                                            'power_consume_inspection_6': dict_pci_6,
-                                            'power_consume_inspection_7_opentest': dict_pci_7o,
-                                            'power_consume_inspection_7_shorttest': dict_pci_7s,
-                                            'carryout': dict_co,                                            
-                                            'file_path': file_path
-                                            }
-                            try:
-                                collection_defectinfo.insert_one(table_schema)
-                                del df_defect
-                                del table_schema
-                                gc.collect()                            
-                            except:
-                                # db 內本來就有資料
-                                pass                                
+                            if "==Step" in line:
+
+                                STEP = line.replace("=","")
+                                step_s = d_no
+                                step_e = 0
                                 
-                        # Chargemap 2d 解檔
-                        elif "Step" in file_name:
-                            
-                            chip_pos = filelog[9].split("_")[0]
-                            step = filelog[9].split("\\")[-1].split("_")[1] + "_" + filelog[9].split("\\")[-1].split("_")[2].split(".")[0]
-                            charge_type = filelog[9].split(".")[-1]
-                            
-                            # 處理路徑檢視
-                            print(file_path)
+                            elif (step_e==0) and ("==END" in line) : 
 
+                                step_s = 0
+                                step_e = d_no-1
+
+                            elif step_s > 0 and step_e == 0: 
+
+                                if line[0] == "[":
+                                    
+                                    Defect_code = line[1:-1]                                     
+                                    
+                                elif line[:4] == "(S1:":
+                                    
+                                    temp = line.split("Val=")
+                                    value = temp[1]
+                                    temp = temp[0].split("Val=")[0][1:-2].split(",")
+                                    if len(temp) == 4:
+                                        S1 = temp[0][3:]
+                                        S2 = temp[1][3:]
+                                        G1 = temp[2][3:]
+                                        G2 = temp[3][3:]
+                                        for S in range(int(S1),int(S2)+1):
+                                            for G in range(int(G1),int(G2)+1):
+                                                if recipe_id[:4] in ["V160","V161"]:
+                                                    if S%3 == 0:
+                                                        LED_Type = "B"
+                                                    elif S%3 == 1:
+                                                        LED_Type = "R"
+                                                    elif S%3 == 2:
+                                                        LED_Type = "G"                                                            
+                                                else:                                            
+                                                    LED_Type = color[S%3]
+                                                defect_info.append([STEP,Defect_code,LED_Type,S,G,value])   
+
+                            # 抓 function test - POWER_PIN
+                            if "[POWER_PIN]" in line:
+
+                                step_pp_s = d_no
+                                step_pp_e = 0
+                                
+                            elif (step_pp_e==0) and ("TOTAL_CNT" in line) : 
+
+                                step_pp_s = 0
+                                step_pp_e = d_no-1
+
+                            elif step_pp_s > 0 and step_pp_e == 0: 
+                                
+                                line = line.split("=")[1]
+                                key = line.split(",")[0]
+                                value = line.split(",")[1].split("(")[0].replace(" ","")
+                                if "(OK)" in line:
+                                    judge = "OK"
+                                if "(NG)" in line:
+                                    judge = "NG"                                        
+                                dict_pp[key] = [value,judge]
+
+                            # 抓 function test - DRIVER_SHORT
+                            if "[DRIVER_SHORT]" in line:
+
+                                step_ds_s = d_no
+                                step_ds_e = 0
+                                
+                            elif (step_ds_e==0) and ("TOTAL_CNT" in line) : 
+
+                                step_ds_s = 0
+                                step_ds_e = d_no-1
+
+                            elif (step_ds_s > 0) and (step_ds_e == 0) and ("_A" in line): 
+                                
+                                key = line.split("<<")[0]
+                                value = line.split(" = ")[1].split(" ")[0]
+                                judge = line.split(" = ")[1].split(" ")[1][1:3]
+                                dict_ds[key] = [value,judge]   
+
+                            # 抓 function test - DRIVER_OPEN
+                            if "[DRIVER_OPEN]" in line:
+
+                                step_do_s = d_no
+                                step_do_e = 0
+                                
+                            elif (step_do_e==0) and ("TOTAL_CNT" in line) : 
+
+                                step_do_s = 0
+                                step_do_e = d_no-1
+
+                            elif (step_do_s > 0) and (step_do_e == 0) and ("_V" in line): 
+                                
+                                key = line.split("<<")[0]
+                                value = line.split(" = ")[1].split(" ")[0]
+                                judge = line.split(" = ")[1].split(" ")[1][1:3]
+                                dict_do[key] = [value,judge]   
+
+                            # 抓 function test - VIDEO_SHORT
+                            if "[VIDEO_SHORT]" in line:
+
+                                step_vs_s = d_no
+                                step_vs_e = 0
+                                
+                            elif (step_vs_e==0) and ("TOTAL_CNT" in line) : 
+
+                                step_vs_s = 0
+                                step_vs_e = d_no-1
+
+                            elif (step_vs_s > 0) and (step_vs_e == 0) and ("_A" in line): 
+                                
+                                key = line.split("_A")[0]
+                                value = line.split(" = ")[1].split("(")[0]
+                                if "(OK)" in line:
+                                    judge = "OK"
+                                if "(NG)" in line:
+                                    judge = "NG"   
+                                    
+                                dict_vs[key] = [value,judge] 
+
+                            # 抓 function test - VIDEO_OPEN
+                            if "[VIDEO_OPEN]" in line:
+
+                                step_vo_s = d_no
+                                step_vo_e = 0
+                                
+                            elif (step_vo_e==0) and ("TOTAL_CNT" in line) : 
+
+                                step_vo_s = 0
+                                step_vo_e = d_no-1
+
+                            elif (step_vo_s > 0) and (step_vo_e == 0) and ("_V " in line): 
+                                
+                                key = line.split("_V ")[0]
+                                value = line.split(" = ")[1].split("(")[0]
+                                if "(OK)" in line:
+                                    judge = "OK"
+                                if "(NG)" in line:
+                                    judge = "NG"  
+                                dict_vo[key] = [value,judge]            
+
+                            # 抓 function test - POWER_CONSUME_INSPECTION_3_LOOP1
+                            if "[POWER_CONSUME_INSPECTION_3_LOOP1]" in line:
+
+                                step_pci3_1_s = d_no
+                                step_pci3_1_e = 0
+                                
+                            elif (step_pci3_1_e==0) and ("TOTAL_CNT" in line) : 
+
+                                step_pci3_1_s = 0
+                                step_pci3_1_e = d_no-1
+
+                            elif (step_pci3_1_s > 0) and (step_pci3_1_e == 0) and ("_A " in line): 
+
+                                key = line.split("(")[0]
+                                value = line.split(" = ")[1].split("(")[0]
+                                judge = line.split(" = ")[1].split("(")[1][:2]
+                                dict_pci3_1[key] = [value,judge]    
+
+                            # 抓 function test - POWER_CONSUME_INSPECTION_3_LOOP2
+                            if "[POWER_CONSUME_INSPECTION_3_LOOP2]" in line:
+
+                                step_pci3_2_s = d_no
+                                step_pci3_2_e = 0
+                                
+                            elif (step_pci3_2_e==0) and ("TOTAL_CNT" in line) : 
+
+                                step_pci3_2_s = 0
+                                step_pci3_2_e = d_no-1
+
+                            elif (step_pci3_2_s > 0) and (step_pci3_2_e == 0) and ("_A " in line): 
+
+                                key = line.split("(")[0]
+                                value = line.split(" = ")[1].split("(")[0]
+                                judge = line.split(" = ")[1].split("(")[1][:2]
+                                dict_pci3_2[key] = [value,judge]  
+                                
+                            # 抓 function test - POWER_CONSUME_INSPECTION_3_LOOP3
+                            if "[POWER_CONSUME_INSPECTION_3_LOOP3]" in line:
+
+                                step_pci3_3_s = d_no
+                                step_pci3_3_e = 0
+                                
+                            elif (step_pci3_3_e==0) and ("TOTAL_CNT" in line) : 
+
+                                step_pci3_3_s = 0
+                                step_pci3_3_e = d_no-1
+
+                            elif (step_pci3_3_s > 0) and (step_pci3_3_e == 0) and ("_A " in line): 
+
+                                key = line.split("(")[0]
+                                value = line.split(" = ")[1].split("(")[0]
+                                judge = line.split(" = ")[1].split("(")[1][:2]
+                                dict_pci3_3[key] = [value,judge]    
+
+                            # 抓 function test - POWER_CONSUME_INSPECTION_3_LOOP4
+                            if "[POWER_CONSUME_INSPECTION_3_LOOP4]" in line:
+
+                                step_pci3_4_s = d_no
+                                step_pci3_4_e = 0
+                                
+                            elif (step_pci3_4_e==0) and ("TOTAL_CNT" in line) : 
+
+                                step_pci3_4_s = 0
+                                step_pci3_4_e = d_no-1
+
+                            elif (step_pci3_4_s > 0) and (step_pci3_4_e == 0) and ("_A " in line): 
+
+                                key = line.split("(")[0]
+                                value = line.split(" = ")[1].split("(")[0]
+                                judge = line.split(" = ")[1].split("(")[1][:2]
+                                dict_pci3_4[key] = [value,judge]    
+
+                            # 抓 function test - POWER_CONSUME_INSPECTION_3_LOOP5
+                            if "[POWER_CONSUME_INSPECTION_3_LOOP5]" in line:
+
+                                step_pci3_5_s = d_no
+                                step_pci3_5_e = 0
+                                
+                            elif (step_pci3_5_e==0) and ("TOTAL_CNT" in line) : 
+
+                                step_pci3_5_s = 0
+                                step_pci3_5_e = d_no-1
+
+                            elif (step_pci3_5_s > 0) and (step_pci3_5_e == 0) and ("_A " in line): 
+
+                                key = line.split("(")[0]
+                                value = line.split(" = ")[1].split("(")[0]
+                                judge = line.split(" = ")[1].split("(")[1][:2]
+                                dict_pci3_5[key] = [value,judge]  
+                                
+                            # 抓 function test - POWER_CONSUME_INSPECTION_3_LOOP6
+                            if "[POWER_CONSUME_INSPECTION_3_LOOP6]" in line:
+
+                                step_pci3_6_s = d_no
+                                step_pci3_6_e = 0
+                                
+                            elif (step_pci3_6_e==0) and ("TOTAL_CNT" in line) : 
+
+                                step_pci3_6_s = 0
+                                step_pci3_6_e = d_no-1
+
+                            elif (step_pci3_6_s > 0) and (step_pci3_6_e == 0) and ("_A " in line): 
+
+                                key = line.split("(")[0]
+                                value = line.split(" = ")[1].split("(")[0]
+                                judge = line.split(" = ")[1].split("(")[1][:2]
+                                dict_pci3_6[key] = [value,judge]       
+
+                            # 抓 function test - POWER_CONSUME_INSPECTION_3_LOOP7
+                            if "[POWER_CONSUME_INSPECTION_3_LOOP7]" in line:
+
+                                step_pci3_7_s = d_no
+                                step_pci3_7_e = 0
+                                
+                            elif (step_pci3_7_e==0) and ("TOTAL_CNT" in line) : 
+
+                                step_pci3_7_s = 0
+                                step_pci3_7_e = d_no-1
+
+                            elif (step_pci3_7_s > 0) and (step_pci3_7_e == 0) and ("_A " in line): 
+
+                                key = line.split("(")[0]
+                                value = line.split(" = ")[1].split("(")[0]
+                                judge = line.split(" = ")[1].split("(")[1][:2]
+                                dict_pci3_7[key] = [value,judge]    
+
+                            # 抓 function test - POWER_CONSUME_INSPECTION_3_LOOP8
+                            if "[POWER_CONSUME_INSPECTION_3_LOOP8]" in line:
+
+                                step_pci3_8_s = d_no
+                                step_pci3_8_e = 0
+                                
+                            elif (step_pci3_8_e==0) and ("TOTAL_CNT" in line) : 
+
+                                step_pci3_8_s = 0
+                                step_pci3_8_e = d_no-1
+
+                            elif (step_pci3_8_s > 0) and (step_pci3_8_e == 0) and ("_A " in line): 
+
+                                key = line.split("(")[0]
+                                value = line.split(" = ")[1].split("(")[0]
+                                judge = line.split(" = ")[1].split("(")[1][:2]
+                                dict_pci3_8[key] = [value,judge]  
+                                
+                            # 抓 function test - POWER_CONSUME_INSPECTION_3_LOOP9
+                            if "[POWER_CONSUME_INSPECTION_3_LOOP9]" in line:
+
+                                step_pci3_9_s = d_no
+                                step_pci3_9_e = 0
+                                
+                            elif (step_pci3_9_e==0) and ("TOTAL_CNT" in line) : 
+
+                                step_pci3_9_s = 0
+                                step_pci3_9_e = d_no-1
+
+                            elif (step_pci3_9_s > 0) and (step_pci3_9_e == 0) and ("_A " in line): 
+
+                                key = line.split("(")[0]
+                                value = line.split(" = ")[1].split("(")[0]
+                                judge = line.split(" = ")[1].split("(")[1][:2]
+                                dict_pci3_9[key] = [value,judge]    
+
+                            # 抓 function test - POWER_CONSUME_INSPECTION_3_LOOP10
+                            if "[POWER_CONSUME_INSPECTION_3_LOOP10]" in line:
+
+                                step_pci3_10_s = d_no
+                                step_pci3_10_e = 0
+                                
+                            elif (step_pci3_10_e==0) and ("TOTAL_CNT" in line) : 
+
+                                step_pci3_10_s = 0
+                                step_pci3_10_e = d_no-1
+
+                            elif (step_pci3_10_s > 0) and (step_pci3_10_e == 0) and ("_A " in line): 
+
+                                key = line.split("(")[0]
+                                value = line.split(" = ")[1].split("(")[0]
+                                judge = line.split(" = ")[1].split("(")[1][:2]
+                                dict_pci3_10[key] = [value,judge]    
+
+                            # 抓 function test - POWER_CONSUME_INSPECTION_3_LOOP11
+                            if "[POWER_CONSUME_INSPECTION_3_LOOP11]" in line:
+
+                                step_pci3_11_s = d_no
+                                step_pci3_11_e = 0
+                                
+                            elif (step_pci3_11_e==0) and ("TOTAL_CNT" in line) : 
+
+                                step_pci3_11_s = 0
+                                step_pci3_11_e = d_no-1
+
+                            elif (step_pci3_11_s > 0) and (step_pci3_11_e == 0) and ("_A " in line): 
+
+                                key = line.split("(")[0]
+                                value = line.split(" = ")[1].split("(")[0]
+                                judge = line.split(" = ")[1].split("(")[1][:2]
+                                dict_pci3_11[key] = [value,judge]  
+                                
+                            # 抓 function test - POWER_CONSUME_INSPECTION_3_LOOP12
+                            if "[POWER_CONSUME_INSPECTION_3_LOOP12]" in line:
+
+                                step_pci3_12_s = d_no
+                                step_pci3_12_e = 0
+                                
+                            elif (step_pci3_12_e==0) and ("TOTAL_CNT" in line) : 
+
+                                step_pci3_12_s = 0
+                                step_pci3_12_e = d_no-1
+
+                            elif (step_pci3_12_s > 0) and (step_pci3_12_e == 0) and ("_A " in line): 
+
+                                key = line.split("(")[0]
+                                value = line.split(" = ")[1].split("(")[0]
+                                judge = line.split(" = ")[1].split("(")[1][:2]
+                                dict_pci3_12[key] = [value,judge]   
+
+                            # 抓 function test - POWER_CONSUME_INSPECTION_3_LOOP13
+                            if "[POWER_CONSUME_INSPECTION_3_LOOP13]" in line:
+
+                                step_pci3_13_s = d_no
+                                step_pci3_13_e = 0
+                                
+                            elif (step_pci3_13_e==0) and ("TOTAL_CNT" in line) : 
+
+                                step_pci3_13_s = 0
+                                step_pci3_13_e = d_no-1
+
+                            elif (step_pci3_13_s > 0) and (step_pci3_13_e == 0) and ("_A " in line): 
+
+                                key = line.split("(")[0]
+                                value = line.split(" = ")[1].split("(")[0]
+                                judge = line.split(" = ")[1].split("(")[1][:2]
+                                dict_pci3_13[key] = [value,judge]    
+
+                            # 抓 function test - POWER_CONSUME_INSPECTION_3_LOOP14
+                            if "[POWER_CONSUME_INSPECTION_3_LOOP14]" in line:
+
+                                step_pci3_14_s = d_no
+                                step_pci3_14_e = 0
+                                
+                            elif (step_pci3_14_e==0) and ("TOTAL_CNT" in line) : 
+
+                                step_pci3_14_s = 0
+                                step_pci3_14_e = d_no-1
+
+                            elif (step_pci3_14_s > 0) and (step_pci3_14_e == 0) and ("_A " in line): 
+
+                                key = line.split("(")[0]
+                                value = line.split(" = ")[1].split("(")[0]
+                                judge = line.split(" = ")[1].split("(")[1][:2]
+                                dict_pci3_14[key] = [value,judge]  
+                                
+                            # 抓 function test - POWER_CONSUME_INSPECTION_3_LOOP15
+                            if "[POWER_CONSUME_INSPECTION_3_LOOP15]" in line:
+
+                                step_pci3_15_s = d_no
+                                step_pci3_15_e = 0
+                                
+                            elif (step_pci3_15_e==0) and ("TOTAL_CNT" in line) : 
+
+                                step_pci3_15_s = 0
+                                step_pci3_15_e = d_no-1
+
+                            elif (step_pci3_15_s > 0) and (step_pci3_15_e == 0) and ("_A " in line): 
+
+                                key = line.split("(")[0]
+                                value = line.split(" = ")[1].split("(")[0]
+                                judge = line.split(" = ")[1].split("(")[1][:2]
+                                dict_pci3_15[key] = [value,judge]    
+
+                            # 抓 function test - POWER_CONSUME_INSPECTION_3_LOOP16
+                            if "[POWER_CONSUME_INSPECTION_3_LOOP16]" in line:
+
+                                step_pci3_16_s = d_no
+                                step_pci3_16_e = 0
+                                
+                            elif (step_pci3_16_e==0) and ("TOTAL_CNT" in line) : 
+
+                                step_pci3_16_s = 0
+                                step_pci3_16_e = d_no-1
+
+                            elif (step_pci3_16_s > 0) and (step_pci3_16_e == 0) and ("_A " in line): 
+
+                                key = line.split("(")[0]
+                                value = line.split(" = ")[1].split("(")[0]
+                                judge = line.split(" = ")[1].split("(")[1][:2]
+                                dict_pci3_16[key] = [value,judge]    
+
+                            # 抓 function test - POWER_CONSUME_INSPECTION_3_LOOP17
+                            if "[POWER_CONSUME_INSPECTION_3_LOOP17]" in line:
+
+                                step_pci3_17_s = d_no
+                                step_pci3_17_e = 0
+                                
+                            elif (step_pci3_17_e==0) and ("TOTAL_CNT" in line) : 
+
+                                step_pci3_17_s = 0
+                                step_pci3_17_e = d_no-1
+
+                            elif (step_pci3_17_s > 0) and (step_pci3_17_e == 0) and ("_A " in line): 
+
+                                key = line.split("(")[0]
+                                value = line.split(" = ")[1].split("(")[0]
+                                judge = line.split(" = ")[1].split("(")[1][:2]
+                                dict_pci3_17[key] = [value,judge]  
+                                
+                            # 抓 function test - POWER_CONSUME_INSPECTION_3_LOOP18
+                            if "[POWER_CONSUME_INSPECTION_3_LOOP18]" in line:
+
+                                step_pci3_18_s = d_no
+                                step_pci3_18_e = 0
+                                
+                            elif (step_pci3_18_e==0) and ("TOTAL_CNT" in line) : 
+
+                                step_pci3_18_s = 0
+                                step_pci3_18_e = d_no-1
+
+                            elif (step_pci3_18_s > 0) and (step_pci3_18_e == 0) and ("_A " in line): 
+
+                                key = line.split("(")[0]
+                                value = line.split(" = ")[1].split("(")[0]
+                                judge = line.split(" = ")[1].split("(")[1][:2]
+                                dict_pci3_18[key] = [value,judge]                                       
+
+                            # 抓 function test - POWER_CONSUME_INSPECTION_4
+                            if "[POWER_CONSUME_INSPECTION_4]" in line:
+
+                                step_pci_4_s = d_no
+                                step_pci_4_e = 0
+                                
+                            elif (step_pci_4_e==0) and ("TOTAL_CNT" in line) : 
+
+                                step_pci_4_s = 0
+                                step_pci_4_e = d_no-1
+
+                            elif (step_pci_4_s > 0) and (step_pci_4_e == 0) and ("_A " in line): 
+                                
+                                key = line.split("_A ")[0]
+                                value = line.split(" = ")[1].split("(")[0]
+                                if "(OK)" in line:
+                                    judge = "OK"
+                                if "(NG)" in line:
+                                    judge = "NG"  
+                                dict_pci_4[key] = [value,judge] 
+
+                            # 抓 function test - POWER_CONSUME_INSPECTION_5
+                            if "[POWER_CONSUME_INSPECTION_5]" in line:
+
+                                step_pci_5_s = d_no
+                                step_pci_5_e = 0
+                                
+                            elif (step_pci_5_e==0) and ("TOTAL_CNT" in line) : 
+
+                                step_pci_5_s = 0
+                                step_pci_5_e = d_no-1
+
+                            elif (step_pci_5_s > 0) and (step_pci_5_e == 0) and ("_A " in line): 
+                                
+                                key = line.split("_A ")[0]
+                                value = line.split(" = ")[1].split("(")[0]
+                                if "(OK)" in line:
+                                    judge = "OK"
+                                if "(NG)" in line:
+                                    judge = "NG"  
+                                dict_pci_5[key] = [value,judge] 
+
+                            # 抓 function test - POWER_CONSUME_INSPECTION_6
+                            if "[POWER_CONSUME_INSPECTION_6]" in line:
+
+                                step_pci_6_s = d_no
+                                step_pci_6_e = 0
+                                
+                            elif (step_pci_6_e==0) and ("TOTAL_CNT" in line) : 
+
+                                step_pci_6_s = 0
+                                step_pci_6_e = d_no-1
+
+                            elif (step_pci_6_s > 0) and (step_pci_6_e == 0) and ("_A " in line): 
+                                
+                                key = line.split("_A ")[0]
+                                value = line.split(" = ")[1].split("(")[0]
+                                if "(OK)" in line:
+                                    judge = "OK"
+                                if "(NG)" in line:
+                                    judge = "NG"  
+                                dict_pci_6[key] = [value,judge]                 
+
+                            # 抓 function test - POWER_CONSUME_INSPECTION_7_Step1
+                            if "[POWER_CONSUME_INSPECTION_7_Step1]" in line:
+
+                                step_pci_7_s = d_no
+                                step_pci_7_e = 0
+                                
+                            elif (step_pci_7_e==0) and ("TOTAL_CNT" in line) : 
+
+                                step_pci_7_s = 0
+                                step_pci_7_e = d_no-1
+
+                            elif (step_pci_7_s > 0) and (step_pci_7_e == 0): 
+                                
+                                key = line.split("<<")[0]
+                                value1 = line.split(" = ")[1].split(" ")[0]
+                                judge1 = line.split(" = ")[1].split(" ")[1][1:3]
+                                value2 = line.split(" = ")[1].split(",")[2].split(" ")[0]
+                                judge2 = line.split(" = ")[1].split(",")[2].split(" ")[1][1:3]
+                                dict_pci_7o[key] = [value1,judge1]
+                                dict_pci_7s[key] = [value2,judge2]      
+
+                            # 抓 function test - CARRYOUT
+                            if "[CARRYOUT]" in line:
+
+                                step_co_s = d_no
+                                step_co_e = 0
+                                
+                            elif (step_co_e==0) and ("TOTAL_CNT" in line) : 
+
+                                step_co_s = 0
+                                step_co_e = d_no-1
+
+                            elif (step_co_s > 0) and (step_co_e == 0): 
+                                
+                                key = line.split(" = ")[0]
+                                value = line.split(" = ")[1].split(" ")[0]
+                                judge = line.split(" = ")[1].split(" ")[1][1:3]
+                                dict_co[key] = [value,judge]
+
+                        df_defect = pd.DataFrame(data=defect_info, columns=['Step','Defect_code','LED_Type','Source','Gate','Value'])
+                        df_defect = fs_defectinfo.put(Binary(pickle.dumps(df_defect, protocol=5))) 
+                                                            
+                        # assign whole chip information
+                        table_schema = {'lm_time': lm_time,
+                                        'chip_start_time': chip_start_time,
+                                        'chip_end_time': chip_end_time,
+                                        'eqp_id': eqp_id,
+                                        'op_id': op_id,
+                                        'recipe_id': recipe_id,
+                                        'chip_id': chip_id,
+                                        'chip_pos': chip_pos,
+                                        'ins_cnt': ins_cnt,
+                                        'BIN': BIN,
+                                        'judgement': judgement,
+                                        'df_defect': df_defect,
+                                        'power_pin': dict_pp,
+                                        'driver_short': dict_ds, 
+                                        'driver_open': dict_do, 
+                                        'video_short': dict_vs, 
+                                        'video_open': dict_vo,
+                                        'power_consume_inspection_3_loop1': dict_pci3_1,
+                                        'power_consume_inspection_3_loop2': dict_pci3_2,
+                                        'power_consume_inspection_3_loop3': dict_pci3_3,
+                                        'power_consume_inspection_3_loop4': dict_pci3_4,
+                                        'power_consume_inspection_3_loop5': dict_pci3_5,
+                                        'power_consume_inspection_3_loop6': dict_pci3_6,
+                                        'power_consume_inspection_3_loop7': dict_pci3_7,
+                                        'power_consume_inspection_3_loop8': dict_pci3_8,
+                                        'power_consume_inspection_3_loop9': dict_pci3_9,
+                                        'power_consume_inspection_3_loop10': dict_pci3_10,
+                                        'power_consume_inspection_3_loop11': dict_pci3_11,
+                                        'power_consume_inspection_3_loop12': dict_pci3_12,
+                                        'power_consume_inspection_3_loop13': dict_pci3_13,
+                                        'power_consume_inspection_3_loop14': dict_pci3_14,
+                                        'power_consume_inspection_3_loop15': dict_pci3_15,
+                                        'power_consume_inspection_3_loop16': dict_pci3_16,
+                                        'power_consume_inspection_3_loop17': dict_pci3_17,
+                                        'power_consume_inspection_3_loop18': dict_pci3_18,   
+                                        'power_consume_inspection_4': dict_pci_4,
+                                        'power_consume_inspection_5': dict_pci_5,
+                                        'power_consume_inspection_6': dict_pci_6,
+                                        'power_consume_inspection_7_opentest': dict_pci_7o,
+                                        'power_consume_inspection_7_shorttest': dict_pci_7s,
+                                        'carryout': dict_co,                                            
+                                        'file_path': file_path
+                                        }
+                        try:
+                            collection_defectinfo.insert_one(table_schema)
+                            del df_defect
+                            del table_schema
+                            gc.collect()                            
+                        except:
+                            # db 內本來就有資料
+                            pass                                
+                            
+                    # Chargemap 2d 解檔
+                    elif "Step" in file_name:
+                        
+                        chip_pos = filelog[9].split("_")[0]
+                        step = filelog[9].split("\\")[-1].split("_")[1] + "_" + filelog[9].split("\\")[-1].split("_")[2].split(".")[0]
+                        charge_type = filelog[9].split(".")[-1]
+                        
+                        # 處理路徑檢視
+                        print(file_path)
+
+                        try:
+                            
                             charge_2d_r, charge_2d_g, charge_2d_b = process_charge_file(f"{data_path}/{file_path}")
                             charge_2d_r = fs_charge2d.put(Binary(pickle.dumps(charge_2d_r, protocol=5)))
                             charge_2d_g = fs_charge2d.put(Binary(pickle.dumps(charge_2d_g, protocol=5)))
@@ -898,21 +901,20 @@ def etl():
                                             '2d_b_object_id': charge_2d_b,
                                             'file_path': file_path
                                             }
-                            
-                            try:
-                                collection_charge2d.insert_one(table_schema)
-                                del charge_2d_r
-                                del charge_2d_g
-                                del charge_2d_b
-                                del table_schema
-                                gc.collect()                              
-                            except:
-                                # db 內本來就有資料
-                                pass
-                            
-                        else:
-                            # 非 adr, chargemap
-                            continue
+                        
+                            collection_charge2d.insert_one(table_schema)
+                            del charge_2d_r
+                            del charge_2d_g
+                            del charge_2d_b
+                            del table_schema
+                            gc.collect()                              
+                        except:
+                            # db 內本來就有資料
+                            pass
+                        
+                    else:
+                        # 非 adr, chargemap
+                        continue
     
     print("The current date and time is", datetime.now().strftime("%d/%m/%Y, %H:%M:%S"))
     client.close()
